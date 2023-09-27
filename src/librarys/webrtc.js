@@ -1,9 +1,5 @@
 import { Peer } from "peerjs";
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export class RTCPeer {
     instance = null;
     id = null;

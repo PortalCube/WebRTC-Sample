@@ -2,8 +2,9 @@ import styled from "styled-components";
 
 import { useEffect, useRef, useState } from "react";
 import { RTCPeer } from "../librarys/webrtc";
-
-const peer = new RTCPeer();
+import { Recorder } from "../librarys/recorder.js";
+import dayjs from "dayjs";
+import { getSampleRate } from "../librarys/convert.js";
 
 const Container = styled.div``;
 
@@ -73,13 +74,14 @@ const Button = styled.button`
     }
 `;
 
+const peer = new RTCPeer();
+const recorder = new Recorder();
+
 const MainPage = () => {
     const clientVideo = useRef(null);
     const remoteVideo = useRef(null);
     const [clientId, setClientId] = useState("받아오는 중...");
     const [remoteId, setRemoteId] = useState("상대방과 연결되지 않았습니다");
-    const [peerStatus, setPeerStatus] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState(false);
     const [id, setId] = useState("");
 
     useEffect(() => {
@@ -89,8 +91,11 @@ const MainPage = () => {
                 audio: true,
             });
 
+            const audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
+
             peer.onOpen = (id) => {
-                setPeerStatus(true);
                 setClientId(id);
             };
 
@@ -100,6 +105,7 @@ const MainPage = () => {
 
             peer.onStream = (stream) => {
                 onStream(stream);
+                recorder.start(audioStream);
             };
 
             peer.onDataClose = () => {
@@ -110,11 +116,29 @@ const MainPage = () => {
                 if (remoteVideo) {
                     remoteVideo.current.srcObject = null;
                 }
+                recorder.stop();
+            };
+
+            recorder.onComplete = async (blob) => {
+                const date = dayjs().format("YYMMDD_HHmmss");
+                const sampleRate = await getSampleRate(blob);
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                document.body.appendChild(a);
+                a.style = "display: none";
+                a.href = url;
+                a.download = `${date}_${sampleRate}_${
+                    peer.id.split("-")[0]
+                }.webm`;
+                a.click();
+                window.URL.revokeObjectURL(url);
             };
 
             peer.start(stream);
 
             if (clientVideo) {
+                clientVideo.current.volume = 0;
                 clientVideo.current.srcObject = stream;
             }
         })();
